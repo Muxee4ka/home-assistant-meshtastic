@@ -32,6 +32,10 @@ class Packet[T]:
         return self.mesh_packet.rx_snr if self.mesh_packet is not None else None
 
     @property
+    def rx_rssi(self) -> int | None:
+        return self.mesh_packet.rx_rssi if self.mesh_packet is not None else None
+
+    @property
     def to_id(self) -> int | None:
         return self.mesh_packet.to if self.mesh_packet is not None else None
 
@@ -93,6 +97,21 @@ class Packet[T]:
     @property
     def channel_index(self) -> int | None:
         return self.mesh_packet.channel if self.mesh_packet is not None else None
+
+    @property
+    def hops(self) -> int | None:
+        mesh_packet = self.mesh_packet
+        if mesh_packet is None:
+            return None
+
+        hop_start = mesh_packet.hop_start
+        hop_limit = mesh_packet.hop_limit
+
+        if hop_start == 0 and hop_limit == 0:
+            return None
+
+        hops = hop_start - hop_limit
+        return hops if hops >= 0 else None
 
 
 class FullNodeInfoPacket(Packet[mesh_pb2.NodeInfo]):

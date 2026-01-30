@@ -218,10 +218,14 @@ trigger:
           node: null
           channel: 0
         gateway: 862525748
+        hops: 0
+        rssi: -118
+        snr: -6.25
         message: Sample Message
 ```
 
 From contains the node id of the sender of the message, to will have the node id of the gateway for direct messages, or a gateway channel id if the message is directed at the channel. 
+Signal details are provided as rssi (in dBm) and snr (in dB) when available.
 Note that the channel id is dependent on the gateway node, so make sure you are using the proper gateway node when replying using that channel id. 
 
 You can create conditions in the automation to filter out the incoming messages you want or you can directly filter in the trigger.
