@@ -216,6 +216,36 @@
         }
       }
     },
+    "send_reaction": {
+      "name": "Send Reaction",
+      "description": "Send an emoji reaction to a message.",
+      "fields": {
+        "emoji": {
+          "name": "Emoji",
+          "description": "Emoji reaction to send"
+        },
+        "message_id": {
+          "name": "Message ID",
+          "description": "ID of the message to react to"
+        },
+        "from": {
+          "name": "From",
+          "description": "Gateway. If not provided, the best gateway node is chosen automatically."
+        },
+        "to": {
+          "name": "To",
+          "description": "Can be a home assistant device, meshtastic node number or meshtastic user id"
+        },
+        "channel": {
+          "name": "Channel",
+          "description": "Can be a home assistant channel entity or meshtastic channel index. IMPORTANT: channel index is node specific, consider setting From in case channel index differ between your gateway nodes."
+        },
+        "ack": {
+          "name": "Acknowledgement",
+          "description": "Request an acknowledgement"
+        }
+      }
+    },
     "request_telemetry": {
       "name": "Request Telemetry",
       "description": "",

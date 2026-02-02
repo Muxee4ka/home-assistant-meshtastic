@@ -74,6 +74,45 @@ broadcast_channel_message:
       selector:
         boolean: {}
 
+send_reaction:
+  fields:
+    from:
+      selector:
+        device:
+          filter:
+            integration: meshtastic
+          entity:
+            domain: meshtastic
+            device_class:
+              - gateway
+    emoji:
+      required: true
+      selector:
+        text: {}
+    message_id:
+      required: true
+      selector:
+        number:
+          min: 1
+          mode: box
+    to:
+      required: false
+      selector:
+        device:
+          integration: meshtastic
+    channel:
+      required: false
+      selector:
+        entity:
+          domain: meshtastic
+          device_class:
+            - channel
+    ack:
+      required: true
+      default: false
+      selector:
+        boolean: {}
+
 
 request_telemetry:
   fields:

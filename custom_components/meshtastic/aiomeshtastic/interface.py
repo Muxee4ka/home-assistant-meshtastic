@@ -1051,6 +1051,13 @@ class MeshInterface:
                 return c.index
         return 0
 
+    @staticmethod
+    def _emoji_to_codepoint(emoji: str) -> int:
+        if not emoji:
+            msg = "Emoji must not be empty"
+            raise ValueError(msg)
+        return ord(next(iter(emoji)))
+
     async def send_text_message(
         self,
         text: str,
@@ -1096,6 +1103,60 @@ class MeshInterface:
             message=text.encode("utf-8"),
             port_num=portnums_pb2.PortNum.TEXT_MESSAGE_APP,
             priority=priority or (MeshPacket.Priority.RELIABLE if want_ack else MeshPacket.Priority.DEFAULT),
+            want_response=False,
+            ack=want_ack,
+        )
+
+    async def send_reaction_message(
+        self,
+        emoji: str,
+        reply_id: int,
+        destination: MeshNode | MeshChannel | int | str = None,
+        *,
+        want_ack: bool = False,
+        channel_index: int | None = None,
+        priority: MeshPacket.Priority | None = None,
+    ) -> None:
+        if isinstance(destination, MeshNode):
+            to_node = destination.id
+            channel_index = None
+        elif isinstance(destination, MeshChannel):
+            to_node = self.BROADCAST_NUM
+            channel_index = destination.index
+        elif isinstance(destination, str):
+            if destination == self.BROADCAST_ADDR:
+                to_node = self.BROADCAST_NUM
+            else:
+                if not destination.startswith("!"):
+                    msg = "Not a valid user id"
+                    raise ValueError(msg)
+                to_node = int(destination[1:], 16)
+        elif isinstance(destination, int):
+            to_node = destination
+        else:
+            to_node = self.BROADCAST_NUM
+
+        if channel_index is not None:
+            if len(self._connected_node_channels) < channel_index:
+                msg = "Unavailable channel index"
+                raise ValueError(msg)
+
+            channel = self._connected_node_channels[channel_index]
+            if channel.role == channel_pb2.Channel.Role.DISABLED:
+                msg = f"Channel #{channel_index} is disabled"
+                raise ValueError(msg)
+
+        emoji_codepoint = self._emoji_to_codepoint(emoji)
+
+        return await self._connection.send_mesh_packet(
+            channel_index=channel_index,
+            to_node=to_node,
+            from_node=self._connected_node_info.my_node_num,
+            message=emoji.encode("utf-8"),
+            port_num=portnums_pb2.PortNum.TEXT_MESSAGE_APP,
+            priority=priority or (MeshPacket.Priority.RELIABLE if want_ack else MeshPacket.Priority.DEFAULT),
+            reply_id=reply_id,
+            emoji=emoji_codepoint,
             want_response=False,
             ack=want_ack,
         )
