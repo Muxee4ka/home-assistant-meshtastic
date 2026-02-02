@@ -233,6 +233,33 @@ class MeshtasticApiClient:
         else:
             return True
 
+    async def send_reaction(
+        self,
+        emoji: str,
+        reply_id: int,
+        destination_id: int | str = MeshInterface.BROADCAST_ADDR,
+        *,
+        want_ack: bool = False,
+        channel_index: int | None = None,
+    ) -> bool:
+        try:
+            await asyncio.wait_for(
+                self._interface.send_reaction_message(
+                    emoji=emoji,
+                    reply_id=reply_id,
+                    destination=destination_id,
+                    want_ack=want_ack,
+                    channel_index=channel_index,
+                ),
+                timeout=30,
+            )
+        except TimeoutError:
+            return False
+        except Exception as e:
+            raise MeshtasticApiClientError from e
+        else:
+            return True
+
     @property
     def metadata(self) -> Mapping[str, Any]:
         metadata = self._interface.connected_node_metadata()

@@ -39,6 +39,8 @@ from .const import (
     ATTR_SERVICE_DATA_TO,
     ATTR_SERVICE_REQUEST_TELEMETRY_DATA_TYPE,
     ATTR_SERVICE_SEND_DIRECT_MESSAGE_DATA_MESSAGE,
+    ATTR_SERVICE_SEND_REACTION_DATA_EMOJI,
+    ATTR_SERVICE_SEND_REACTION_DATA_MESSAGE_ID,
     ATTR_SERVICE_SEND_TEXT_DATA_TEXT,
     DOMAIN,
     LOGGER,
@@ -47,6 +49,7 @@ from .const import (
     SERVICE_REQUEST_TELEMETRY,
     SERVICE_REQUEST_TRACEROUTE,
     SERVICE_SEND_DIRECT_MESSAGE,
+    SERVICE_SEND_REACTION,
     SERVICE_SEND_TEXT,
     STATE_ATTRIBUTE_CHANNEL_INDEX,
     STATE_ATTRIBUTE_CHANNEL_NODE,
@@ -79,6 +82,17 @@ SERVICE_BROADCAST_CHANNEL_MESSAGE_SCHEMA = vol.Schema(
     }
 )
 
+SERVICE_SEND_REACTION_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_SERVICE_SEND_REACTION_DATA_MESSAGE_ID): cv.positive_int,
+        vol.Required(ATTR_SERVICE_SEND_REACTION_DATA_EMOJI): cv.string,
+        vol.Optional(ATTR_SERVICE_DATA_TO): cv.string,
+        vol.Optional(ATTR_SERVICE_DATA_FROM): cv.string,
+        vol.Optional(ATTR_SERVICE_DATA_CHANNEL): cv.string,
+        vol.Required(ATTR_SERVICE_DATA_ACK, default=False): cv.boolean,
+    }
+)
+
 SERVICE_BASE_REQUEST_SCHEMA = vol.Schema(
     {
         vol.Optional(ATTR_SERVICE_DATA_FROM): cv.string,
@@ -104,6 +118,7 @@ SUPPORTED_SERVICES = {
     SERVICE_SEND_TEXT: SupportsResponse.OPTIONAL,
     SERVICE_SEND_DIRECT_MESSAGE: SupportsResponse.NONE,
     SERVICE_BROADCAST_CHANNEL_MESSAGE: SupportsResponse.NONE,
+    SERVICE_SEND_REACTION: SupportsResponse.OPTIONAL,
     SERVICE_REQUEST_TELEMETRY: SupportsResponse.OPTIONAL,
     SERVICE_REQUEST_POSITION: SupportsResponse.OPTIONAL,
     SERVICE_REQUEST_TRACEROUTE: SupportsResponse.OPTIONAL,
@@ -113,6 +128,7 @@ SERVICE_TO_SCHEMA = {
     SERVICE_SEND_TEXT: SERVICE_SEND_TEXT_SCHEMA,
     SERVICE_SEND_DIRECT_MESSAGE: SERVICE_SEND_DIRECT_MESSAGE_SCHEMA,
     SERVICE_BROADCAST_CHANNEL_MESSAGE: SERVICE_BROADCAST_CHANNEL_MESSAGE_SCHEMA,
+    SERVICE_SEND_REACTION: SERVICE_SEND_REACTION_SCHEMA,
     SERVICE_REQUEST_TELEMETRY: SERVICE_REQUEST_TELEMETRY_SCHEMA,
     SERVICE_REQUEST_POSITION: SERVICE_REQUEST_POSITION_SCHEMA,
     SERVICE_REQUEST_TRACEROUTE: SERVICE_REQUEST_TRACEROUTE_SCHEMA,
@@ -160,6 +176,7 @@ async def async_register_gateway(hass: HomeAssistant, entry: MeshtasticConfigEnt
     await _setup_service_send_text_handler(hass, entry, client)
     await _setup_service_send_direct_message_handler(hass, entry, client)
     await _setup_service_broadcast_channel_message_handler(hass, entry, client)
+    await _setup_service_send_reaction_handler(hass, entry, client)
     await _setup_service_request_telemetry_handler(hass, entry, client)
     await _setup_service_request_position_handler(hass, entry, client)
     await _setup_service_request_traceroute_handler(hass, entry, client)
@@ -318,6 +335,22 @@ async def _setup_service_broadcast_channel_message_handler(
         return None
 
     _service_handlers[entry.entry_id][SERVICE_BROADCAST_CHANNEL_MESSAGE] = handle_service_call
+
+
+async def _setup_service_send_reaction_handler(
+    hass: HomeAssistant, entry: MeshtasticConfigEntry, client: MeshtasticApiClient
+) -> None:
+    async def handler(call: ServiceCall, to: int, channel_index: int | None) -> ServiceResponse:
+        await client.send_reaction(
+            emoji=call.data[ATTR_SERVICE_SEND_REACTION_DATA_EMOJI],
+            reply_id=call.data[ATTR_SERVICE_SEND_REACTION_DATA_MESSAGE_ID],
+            destination_id=to,
+            channel_index=channel_index,
+            want_ack=call.data[ATTR_SERVICE_DATA_ACK],
+        )
+        return None
+
+    _service_handlers[entry.entry_id][SERVICE_SEND_REACTION] = await _build_default_handler(hass, client, handler)
 
 
 async def _setup_service_request_telemetry_handler(

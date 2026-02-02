@@ -249,6 +249,8 @@ class ClientApiConnection:
         channel_index: int | None = None,
         *,
         from_node: int | None = None,
+        reply_id: int | None = None,
+        emoji: int | None = None,
         ack: bool = False,
         want_response: bool = False,
         ack_callback: Callable[[Packet[mesh_pb2.Routing]], Awaitable[None]] | None = None,
@@ -262,6 +264,10 @@ class ClientApiConnection:
         )
         mesh_packet.decoded.portnum = port_num
         mesh_packet.decoded.want_response = want_response
+        if reply_id is not None:
+            mesh_packet.decoded.reply_id = reply_id
+        if emoji is not None:
+            mesh_packet.decoded.emoji = emoji
         mesh_packet.id = self._generate_packet_id()
         if from_node is not None:
             mesh_packet.__setattr__("from", from_node)
