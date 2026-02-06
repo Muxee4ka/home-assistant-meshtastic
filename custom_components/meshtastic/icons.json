@@ -17,6 +17,9 @@
     },
     "request_traceroute": {
       "service": "mdi:message-question"
+    },
+    "request_nodeinfo": {
+      "service": "mdi:message-question"
     }
   }
 }

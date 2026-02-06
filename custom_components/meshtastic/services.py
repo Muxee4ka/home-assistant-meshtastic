@@ -48,6 +48,7 @@ from .const import (
     SERVICE_REQUEST_POSITION,
     SERVICE_REQUEST_TELEMETRY,
     SERVICE_REQUEST_TRACEROUTE,
+    SERVICE_REQUEST_NODEINFO,
     SERVICE_SEND_DIRECT_MESSAGE,
     SERVICE_SEND_REACTION,
     SERVICE_SEND_TEXT,
@@ -110,6 +111,7 @@ SERVICE_REQUEST_TELEMETRY_SCHEMA = SERVICE_BASE_REQUEST_SCHEMA.extend(
 
 SERVICE_REQUEST_POSITION_SCHEMA = SERVICE_BASE_REQUEST_SCHEMA.extend({})
 SERVICE_REQUEST_TRACEROUTE_SCHEMA = SERVICE_BASE_REQUEST_SCHEMA.extend({})
+SERVICE_REQUEST_NODEINFO_SCHEMA = SERVICE_BASE_REQUEST_SCHEMA.extend({})
 
 _SERVICE_CANT_HANDLE_RESPONSE = object()
 _service_handlers: dict[str, dict[str, Callable[[ServiceCall], Awaitable[ServiceResponse]]]] = defaultdict(dict)
@@ -122,6 +124,7 @@ SUPPORTED_SERVICES = {
     SERVICE_REQUEST_TELEMETRY: SupportsResponse.OPTIONAL,
     SERVICE_REQUEST_POSITION: SupportsResponse.OPTIONAL,
     SERVICE_REQUEST_TRACEROUTE: SupportsResponse.OPTIONAL,
+    SERVICE_REQUEST_NODEINFO: SupportsResponse.OPTIONAL,
 }
 
 SERVICE_TO_SCHEMA = {
@@ -132,6 +135,7 @@ SERVICE_TO_SCHEMA = {
     SERVICE_REQUEST_TELEMETRY: SERVICE_REQUEST_TELEMETRY_SCHEMA,
     SERVICE_REQUEST_POSITION: SERVICE_REQUEST_POSITION_SCHEMA,
     SERVICE_REQUEST_TRACEROUTE: SERVICE_REQUEST_TRACEROUTE_SCHEMA,
+    SERVICE_REQUEST_NODEINFO: SERVICE_REQUEST_NODEINFO_SCHEMA,
 }
 
 
@@ -180,6 +184,7 @@ async def async_register_gateway(hass: HomeAssistant, entry: MeshtasticConfigEnt
     await _setup_service_request_telemetry_handler(hass, entry, client)
     await _setup_service_request_position_handler(hass, entry, client)
     await _setup_service_request_traceroute_handler(hass, entry, client)
+    await _setup_service_request_nodeinfo_handler(hass, entry, client)
 
 
 async def async_unregister_gateway(hass: HomeAssistant, entry: MeshtasticConfigEntry) -> None:
@@ -379,6 +384,21 @@ async def _setup_service_request_traceroute_handler(
         return await entry.runtime_data.client.request_traceroute(to)
 
     _service_handlers[entry.entry_id][SERVICE_REQUEST_TRACEROUTE] = await _build_default_handler(hass, client, handler)
+
+
+async def _setup_service_request_nodeinfo_handler(
+    hass: HomeAssistant, entry: MeshtasticConfigEntry, client: MeshtasticApiClient
+) -> None:
+    async def handler(call: ServiceCall, to: int | str, channel_index: int | None) -> ServiceResponse:  # noqa: ARG001
+        if isinstance(to, str):
+            if to.startswith("!"):
+                to = int(to[1:], 16)
+            elif to.isnumeric():
+                to = int(to)
+
+        return await entry.runtime_data.client.request_nodeinfo(to)
+
+    _service_handlers[entry.entry_id][SERVICE_REQUEST_NODEINFO] = await _build_default_handler(hass, client, handler)
 
 
 async def _setup_service_send_text_handler(
