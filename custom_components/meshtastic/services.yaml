@@ -175,3 +175,20 @@ request_traceroute:
       selector:
         device:
           integration: meshtastic
+
+request_nodeinfo:
+  fields:
+    from:
+      selector:
+        device:
+          filter:
+            integration: meshtastic
+          entity:
+            domain: meshtastic
+            device_class:
+              - gateway
+    to:
+      required: true
+      selector:
+        device:
+          integration: meshtastic

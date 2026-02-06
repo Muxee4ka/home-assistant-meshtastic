@@ -297,6 +297,30 @@ class MeshtasticApiClient:
             to_channel = None
             to_node = packet.to_id
 
+        reply_id: int | None = None
+        emoji_codepoint: int | None = None
+        emoji_char: str | None = None
+
+        data = packet.data
+        if data is not None:
+            if data.reply_id:
+                reply_id = data.reply_id
+            if data.emoji:
+                emoji_codepoint = data.emoji
+                try:
+                    emoji_char = chr(data.emoji)
+                except ValueError:
+                    emoji_char = None
+
+        is_reply = reply_id is not None
+        is_reaction = emoji_codepoint is not None
+        if is_reaction:
+            message_kind = "reaction"
+        elif is_reply:
+            message_kind = "reply"
+        else:
+            message_kind = "message"
+
         event_data = self._build_event_data(
             node.id,
             {
@@ -307,6 +331,12 @@ class MeshtasticApiClient:
                 "rssi": packet.rx_rssi,
                 "snr": packet.rx_snr,
                 "message": packet.app_payload,
+                "reply_id": reply_id,
+                "emoji": emoji_codepoint,
+                "emoji_char": emoji_char,
+                "is_reply": is_reply,
+                "is_reaction": is_reaction,
+                "message_kind": message_kind,
             },
         )
 
@@ -403,3 +433,14 @@ class MeshtasticApiClient:
             return self._message_to_dict(response)
         except MeshtasticError as e:
             raise MeshtasticApiClientError(str(e)) from e
+
+    async def request_nodeinfo(self, node: int) -> Mapping[str, Any]:
+        if not await self._interface.connected_node_ready():
+            return {}
+
+        node_info = self._interface.nodes().get(node)
+        if node_info is None:
+            msg = f"Node {node} not found"
+            raise MeshtasticApiClientError(msg)
+
+        return self._transform_node_info(node_info)

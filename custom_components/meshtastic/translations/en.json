@@ -291,6 +291,20 @@
           "description": ""
         }
       }
+    },
+    "request_nodeinfo": {
+      "name": "Request Node Info",
+      "description": "Returns cached node information from the gateway node database.",
+      "fields": {
+        "from": {
+          "name": "From",
+          "description": "Gateway. If not provided, the best gateway node is chosen automatically."
+        },
+        "to": {
+          "name": "Device",
+          "description": ""
+        }
+      }
     }
   },
   "entity": {

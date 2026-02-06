@@ -212,20 +212,29 @@ trigger:
   event:
     event_type: meshtastic_api_text_message
     event_data:
-      data:
-        from: 1127918844
-        to:
-          node: null
-          channel: 0
-        gateway: 862525748
-        hops: 0
-        rssi: -118
-        snr: -6.25
-        message: Sample Message
+        data:
+          from: 1127918844
+          to:
+            node: null
+            channel: 0
+          gateway: 862525748
+          hops: 0
+          rssi: -118
+          snr: -6.25
+          message: Sample Message
+          reply_id: null
+          emoji: null
+          emoji_char: null
+          is_reply: false
+          is_reaction: false
+          message_kind: message
 ```
 
-From contains the node id of the sender of the message, to will have the node id of the gateway for direct messages, or a gateway channel id if the message is directed at the channel. 
-Signal details are provided as rssi (in dBm) and snr (in dB) when available.
+  From contains the node id of the sender of the message, to will have the node id of the gateway for direct messages, or a gateway channel id if the message is directed at the channel.
+  Signal details are provided as rssi (in dBm) and snr (in dB) when available.
+  If the message is a reply, `reply_id` contains the original message id.
+  If the message is a reaction, `emoji` contains the unicode codepoint and `emoji_char` contains the emoji character. 
+  Use `message_kind` (`message`, `reply`, or `reaction`) or `is_reply`/`is_reaction` to distinguish between the types.
 Note that the channel id is dependent on the gateway node, so make sure you are using the proper gateway node when replying using that channel id. 
 
 You can create conditions in the automation to filter out the incoming messages you want or you can directly filter in the trigger.

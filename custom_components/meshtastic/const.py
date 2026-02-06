@@ -61,6 +61,7 @@ SERVICE_SEND_REACTION = "send_reaction"
 SERVICE_REQUEST_TELEMETRY = "request_telemetry"
 SERVICE_REQUEST_POSITION = "request_position"
 SERVICE_REQUEST_TRACEROUTE = "request_traceroute"
+SERVICE_REQUEST_NODEINFO = "request_nodeinfo"
 
 ATTR_SERVICE_DATA_TO = "to"
 ATTR_SERVICE_DATA_CHANNEL = "channel"
