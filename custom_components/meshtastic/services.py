@@ -418,13 +418,7 @@ async def _setup_service_request_traceroute_handler(
 async def _setup_service_request_nodeinfo_handler(
     hass: HomeAssistant, entry: MeshtasticConfigEntry, client: MeshtasticApiClient
 ) -> None:
-    async def handler(call: ServiceCall, to: int | str, channel_index: int | None) -> ServiceResponse:  # noqa: ARG001
-        if isinstance(to, str):
-            if to.startswith("!"):
-                to = int(to[1:], 16)
-            elif to.isnumeric():
-                to = int(to)
-
+    async def handler(call: ServiceCall, to: int, channel_index: int | None) -> Mapping[str, Any]:  # noqa: ARG001
         return await entry.runtime_data.client.request_nodeinfo(to)
 
     _service_handlers[entry.entry_id][SERVICE_REQUEST_NODEINFO] = await _build_default_handler(hass, client, handler)

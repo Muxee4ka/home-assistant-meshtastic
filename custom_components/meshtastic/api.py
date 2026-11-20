@@ -450,7 +450,7 @@ class MeshtasticApiClient:
         is_reply = data.get("reply_id") is not None
 
         emoji_char: str | None = None
-        if is_reaction:
+        if emoji_codepoint is not None:
             # emoji is a flag (1) in current Meshtastic clients, the reaction itself is the text payload;
             # older clients put the codepoint there
             if emoji_codepoint > 1:
