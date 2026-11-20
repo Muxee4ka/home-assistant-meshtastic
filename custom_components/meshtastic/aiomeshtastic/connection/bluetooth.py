@@ -5,12 +5,13 @@
 
 import asyncio
 import struct
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import suppress
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import bleak
 from bleak import BaseBleakClient, BleakClient, BleakGATTCharacteristic
+from bleak_retry_connector import establish_connection
 from google.protobuf import message
 
 from ..protobuf import mesh_pb2  # noqa: TID252
@@ -28,9 +29,14 @@ class BluetoothConnectionError(ClientApiConnectionError):
     pass
 
 
-class BluetoothConnectionServiceNotFoundError:
+class BluetoothConnectionServiceNotFoundError(ClientApiConnectionError):
     def __init__(self) -> None:
         super().__init__("Bluetooth meshtastic service not found")
+
+
+class BluetoothDeviceNotFoundError(ClientApiConnectionError):
+    def __init__(self, address: str) -> None:
+        super().__init__(f"No connectable Bluetooth device at {address}")
 
 
 class BluetoothConnection(ClientApiConnection):
@@ -41,56 +47,73 @@ class BluetoothConnection(ClientApiConnection):
     BTM_CHARACTERISTIC_LOG_UUID = "5a3d6e49-06e6-4423-9944-e9de8cdf9547"
 
     def __init__(
-        self, ble_address: str, bleak_client_backend: type[BaseBleakClient] | None = None, connect_timeout: float = 10.0
+        self,
+        ble_address: str,
+        ble_device_provider: Callable[[], Any | None] | None = None,
+        bleak_client_backend: type[BaseBleakClient] | None = None,
+        connect_timeout: float = 10.0,
     ) -> None:
         super().__init__()
         self._ble_address = ble_address
+        self._ble_device_provider = ble_device_provider
         self._bleak_client_backend = bleak_client_backend
         self._connect_timeout = connect_timeout
         self._ble_meshtastic_service: BleakGATTService | None = None
-        self._ble_from_radio: BleakGATTCharacteristic | None
-        self._ble_to_radio: BleakGATTCharacteristic | None
-        self._ble_from_num: BleakGATTCharacteristic | None
-        self._ble_log: BleakGATTCharacteristic | None
+        self._ble_from_radio: BleakGATTCharacteristic
+        self._ble_to_radio: BleakGATTCharacteristic
+        self._ble_from_num: BleakGATTCharacteristic
+        self._ble_log: BleakGATTCharacteristic
         self._write_lock = asyncio.Lock()
         self._last_packet_number = None
         self._force_read_event = asyncio.Event()
 
     async def _connect(self) -> None:
-        self._bleak_client = BleakClient(
-            self._ble_address, timeout=self._connect_timeout, backend=self._bleak_client_backend
+        if self._ble_device_provider is not None:
+            # a device from an earlier connect can name an adapter or proxy that is gone
+            ble_device = self._ble_device_provider()
+            if ble_device is None:
+                raise BluetoothDeviceNotFoundError(self._ble_address)
+            self._bleak_client = await establish_connection(
+                client_class=BleakClient,
+                device=ble_device,
+                name=self._ble_address,
+                max_attempts=3,
+            )
+        else:
+            self._bleak_client = BleakClient(
+                self._ble_address, timeout=self._connect_timeout, backend=self._bleak_client_backend
+            )
+            await self._bleak_client.connect()
+
+        self._ble_meshtastic_service = cast(
+            "BleakGATTService | None", self._bleak_client.services[BluetoothConnection.BTM_SERVICE_UUID]
         )
-        await self._bleak_client.connect()
-
-        # attempt pairing, we don't know if it is required. Should not harm if
-        # not needed. if pairing is required, external input is necessary as we are not
-        # able to fully pair with bleak see https://github.com/hbldh/bleak/issues/1434.
-        # possible workaround: https://technotes.kynetics.com/2018/pairing_agents_bluez/
-        try:
-            await self._bleak_client.pair()
-        except:  # noqa: E722
-            self._logger.debug("Pairing failed", exc_info=True)
-
-        self._ble_meshtastic_service = self._bleak_client.services[BluetoothConnection.BTM_SERVICE_UUID]
 
         if self._ble_meshtastic_service is None:
             raise BluetoothConnectionServiceNotFoundError
 
-        self._ble_from_radio = self._ble_meshtastic_service.get_characteristic(
-            BluetoothConnection.BTM_CHARACTERISTIC_FROM_RADIO_UUID
+        # get_characteristic returns None for a missing one; the cast keeps the field types free of Optional
+        self._ble_from_radio = cast(
+            "BleakGATTCharacteristic",
+            self._ble_meshtastic_service.get_characteristic(BluetoothConnection.BTM_CHARACTERISTIC_FROM_RADIO_UUID),
         )
-        self._ble_to_radio = self._ble_meshtastic_service.get_characteristic(
-            BluetoothConnection.BTM_CHARACTERISTIC_TO_RADIO_UUID
+        self._ble_to_radio = cast(
+            "BleakGATTCharacteristic",
+            self._ble_meshtastic_service.get_characteristic(BluetoothConnection.BTM_CHARACTERISTIC_TO_RADIO_UUID),
         )
-        self._ble_from_num = self._ble_meshtastic_service.get_characteristic(
-            BluetoothConnection.BTM_CHARACTERISTIC_FROM_NUM_UUID
+        self._ble_from_num = cast(
+            "BleakGATTCharacteristic",
+            self._ble_meshtastic_service.get_characteristic(BluetoothConnection.BTM_CHARACTERISTIC_FROM_NUM_UUID),
         )
-        self._ble_log = self._ble_meshtastic_service.get_characteristic(BluetoothConnection.BTM_CHARACTERISTIC_LOG_UUID)
+        self._ble_log = cast(
+            "BleakGATTCharacteristic",
+            self._ble_meshtastic_service.get_characteristic(BluetoothConnection.BTM_CHARACTERISTIC_LOG_UUID),
+        )
 
     async def _disconnect(self) -> None:
         try:
             await self._bleak_client.disconnect()
-        except:  # noqa: E722
+        except Exception:
             self._logger.debug("Disconnecting failed", exc_info=True)
 
     @property
@@ -104,7 +127,7 @@ class BluetoothConnection(ClientApiConnection):
         notify_timeout_duration: int,
         notify_timeout_count: int,
         max_notify_timeouts_before_restart: int,
-        restart_notify_func: callable,
+        restart_notify_func: Callable[[], Awaitable[None]],
     ) -> tuple[bool, int]:
         """Wait for packet notification or force read event."""
         wait_notify = asyncio.create_task(packet_num_queue.get(), name="wait_notify")
@@ -147,10 +170,10 @@ class BluetoothConnection(ClientApiConnection):
 
         return continue_active_read, notify_timeout_count
 
-    async def _packet_stream(self) -> AsyncGenerator[mesh_pb2.FromRadio, Any]:  # noqa: PLR0915
+    async def _packet_stream(self) -> AsyncGenerator[mesh_pb2.FromRadio, Any]:
         if not self.is_connected:
             return
-        packet_num_queue = asyncio.Queue()
+        packet_num_queue: asyncio.Queue[int] = asyncio.Queue()
         force_read_event = self._force_read_event
 
         def notification_handler(_: BleakGATTCharacteristic, data: bytearray) -> None:
@@ -179,7 +202,7 @@ class BluetoothConnection(ClientApiConnection):
                     with suppress(Exception):
                         await stop_notify()
                     await start_notify()
-                except:  # noqa: E722
+                except Exception:
                     self._logger.debug("Restart notify failed", exc_info=True)
 
             await start_notify()
@@ -188,9 +211,8 @@ class BluetoothConnection(ClientApiConnection):
             notify_timeout_duration = 300
             max_notify_timeouts_before_restart = 2
             while True:
-                packet = await self._bleak_client.read_gatt_char(self._ble_from_radio)
-                if not isinstance(packet, bytes):
-                    packet = bytes(packet)
+                raw_packet = await self._bleak_client.read_gatt_char(self._ble_from_radio)
+                packet = raw_packet if isinstance(raw_packet, bytes) else bytes(raw_packet)
                 if packet == b"":
                     # no more packets available, waiting for notification or force_read event.
                     # if we do not receive bluetooth notifications for an extended period of time, this could be an

@@ -34,7 +34,16 @@ send_text:
       required: true
       selector:
         boolean: {}
-
+    reply_id:
+      required: false
+      selector:
+        text:
+          multiline: false
+    is_reaction:
+      required: false
+      default: false
+      selector:
+        boolean: {}
 
 send_direct_message:
   fields:
@@ -51,6 +60,16 @@ send_direct_message:
     ack:
       required: true
       default: true
+      selector:
+        boolean: {}
+    reply_id:
+      required: false
+      selector:
+        text:
+          multiline: false
+    is_reaction:
+      required: false
+      default: false
       selector:
         boolean: {}
 
@@ -73,46 +92,16 @@ broadcast_channel_message:
       default: true
       selector:
         boolean: {}
-
-send_reaction:
-  fields:
-    from:
-      selector:
-        device:
-          filter:
-            integration: meshtastic
-          entity:
-            domain: meshtastic
-            device_class:
-              - gateway
-    emoji:
-      required: true
-      selector:
-        text: {}
-    message_id:
-      required: true
-      selector:
-        number:
-          min: 1
-          mode: box
-    to:
+    reply_id:
       required: false
       selector:
-        device:
-          integration: meshtastic
-    channel:
+        text:
+          multiline: false
+    is_reaction:
       required: false
-      selector:
-        entity:
-          domain: meshtastic
-          device_class:
-            - channel
-    ack:
-      required: true
       default: false
       selector:
         boolean: {}
-
 
 request_telemetry:
   fields:
@@ -175,6 +164,45 @@ request_traceroute:
       selector:
         device:
           integration: meshtastic
+
+send_reaction:
+  fields:
+    from:
+      selector:
+        device:
+          filter:
+            integration: meshtastic
+          entity:
+            domain: meshtastic
+            device_class:
+              - gateway
+    emoji:
+      required: true
+      selector:
+        text: {}
+    message_id:
+      required: true
+      selector:
+        number:
+          min: 1
+          mode: box
+    to:
+      required: false
+      selector:
+        device:
+          integration: meshtastic
+    channel:
+      required: false
+      selector:
+        entity:
+          domain: meshtastic
+          device_class:
+            - channel
+    ack:
+      required: true
+      default: false
+      selector:
+        boolean: {}
 
 request_nodeinfo:
   fields:

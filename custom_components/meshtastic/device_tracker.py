@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     from .data import MeshtasticConfigEntry, MeshtasticData
 
 
+PARALLEL_UPDATES = 0
+
+
 def _build_device_trackers(
     nodes: typing.Mapping[int, typing.Mapping[str, typing.Any]], runtime_data: MeshtasticData
 ) -> typing.Iterable[MeshtasticDeviceTracker]:
@@ -48,11 +51,7 @@ async def async_setup_entry(
     await helpers.setup_platform_entry(hass, entry, async_add_entities, _build_device_trackers)
 
 
-async def async_unload_entry(
-    hass: HomeAssistant,
-    entry: MeshtasticConfigEntry,
-) -> bool:
-    return await helpers.async_unload_entry(hass, entry)
+_DOP_ATTRIBUTES = ("PDOP", "HDOP", "VDOP")
 
 
 class MeshtasticDeviceTracker(MeshtasticNodeEntity, TrackerEntity):
@@ -95,9 +94,10 @@ class MeshtasticDeviceTracker(MeshtasticNodeEntity, TrackerEntity):
         node_id: int,
     ) -> None:
         super().__init__(coordinator, gateway, node_id, DEVICE_TRACKER_DOMAIN, entity_description)
-        self._attr_name = self.coordinator.data[self.node_id].get("user", {}).get("longName", None)
         self._attr_name = None
         self._attr_has_entity_name = True
+        # the position is known already; without this the tracker has none until the next coordinator update
+        self._async_update_attrs()
 
     def _async_update_attrs(self) -> None:
         self._attr_available = (
@@ -112,15 +112,9 @@ class MeshtasticDeviceTracker(MeshtasticNodeEntity, TrackerEntity):
         self._attr_latitude = position.get("latitude", None)
         self._attr_longitude = position.get("longitude", None)
         self._attr_location_accuracy = self._precision_to_meters.get(precision_bits, 0)
+        # PDOP/HDOP/VDOP are transmitted in 1/100 units, convert to actual DOP values
         self._attr_extra_state_attributes = {
-            k: v
+            k: v / 100 if k in _DOP_ATTRIBUTES else v
             for k, v in position.items()
-            if k in ["altitude", "groundSpeed", "groundTrack", "locationSource", "satsInView"]
+            if k in ["altitude", "groundSpeed", "groundTrack", "locationSource", "satsInView", *_DOP_ATTRIBUTES]
         }
-
-    @property
-    def battery_level(self) -> int | None:
-        level = self.coordinator.data[self.node_id].get("deviceMetrics", {}).get("batteryLevel", None)
-        if level is not None:
-            return max(0, min(100, level))
-        return level
